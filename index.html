@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Penny Hunter</title>
+    <style>
+        body { font-family: Arial; padding: 40px; background: #f0f0f0; }
+        h1 { color: green; }
+        button { padding: 12px 24px; font-size: 16px; margin: 5px; border: none; cursor: pointer; }
+        .start { background: #28a745; color: white; }
+        .stop { background: #dc3545; color: white; }
+        .item { padding: 10px; border-bottom: 1px solid #ddd; }
+        .price { color: green; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>Penny Hunter</h1>
+    <p>Scanning Home Depot for <span class="price">$0.01</span> items...</p>
+    <button class="start" onclick="startScan()">Start Scanner</button>
+    <button class="stop" onclick="stopScan()" style="display:none">Stop Scanner</button>
+    <div id="status">Ready</div>
+    <h2>Found Items ({{ items|length }})</h2>
+    <div id="items">
+        {% for item in items %}
+        <div class="item">
+            <a href="{{ item.url }}" target="_blank">{{ item.title }}</a>
+            <span class="price">$0.01</span>
+        </div>
+        {% endfor %}
+    </div>
+
+    <script>
+    function startScan() {
+        fetch('/start').then(r => r.json()).then(d => {
+            document.querySelector('.start').style.display = 'none';
+            document.querySelector('.stop').style.display = 'inline';
+            document.getElementById('status').innerText = 'Scanning every 15 min...';
+            pollItems();
+        });
+    }
+    function stopScan() {
+        fetch('/stop').then(() => {
+            document.querySelector('.start').style.display = 'inline';
+            document.querySelector('.stop').style.display = 'none';
+            document.getElementById('status').innerText = 'Stopped';
+        });
+    }
+    function pollItems() {
+        if (document.querySelector('.stop').style.display === 'inline') {
+            fetch('/start').then(r => r.json()).then(d => {
+                let html = '';
+                d.items.forEach(i => {
+                    html += `<div class="item"><a href="${i.url}" target="_blank">${i.title}</a> <span class="price">$0.01</span></div>`;
+                });
+                document.getElementById('items').innerHTML = html;
+                setTimeout(pollItems, 10000);
+            });
+        }
+    }
+    </script>
+</body>
+</html>
