@@ -1,61 +1,82 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Penny Hunter</title>
-    <style>
-        body { font-family: Arial; padding: 40px; background: #f0f0f0; }
-        h1 { color: green; }
-        button { padding: 12px 24px; font-size: 16px; margin: 5px; border: none; cursor: pointer; }
-        .start { background: #28a745; color: white; }
-        .stop { background: #dc3545; color: white; }
-        .item { padding: 10px; border-bottom: 1px solid #ddd; }
-        .price { color: green; font-weight: bold; }
-    </style>
+  <title>Penny Hunter Pro</title>
+  <style>
+    body { font-family: Arial; text-align: center; margin-top: 50px; background: #f4f4f4; }
+    .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+    input, button { padding: 10px; margin: 10px; font-size: 16px; }
+    button { background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    button:hover { background: #0056b3; }
+    .status { margin: 20px; font-weight: bold; }
+    .items { margin-top: 20px; }
+    .item { padding: 10px; border-bottom: 1px solid #eee; text-align: left; }
+    .score-high { color: green; font-weight: bold; }
+  </style>
 </head>
 <body>
-    <h1>Penny Hunter</h1>
-    <p>Scanning Home Depot for <span class="price">$0.01</span> items...</p>
-    <button class="start" onclick="startScan()">Start Scanner</button>
-    <button class="stop" onclick="stopScan()" style="display:none">Stop Scanner</button>
-    <div id="status">Ready</div>
-    <h2>Found Items ({{ items|length }})</h2>
-    <div id="items">
-        {% for item in items %}
-        <div class="item">
-            <a href="{{ item.url }}" target="_blank">{{ item.title }}</a>
-            <span class="price">$0.01</span>
-        </div>
-        {% endfor %}
-    </div>
+  <div class="container">
+    <h1>Penny Hunter Pro</h1>
+    <p>Auto-scans Home Depot for <strong>$0.01 items</strong> near you.</p>
 
-    <script>
+    <div>
+      <input type="text" id="phone" placeholder="Enter your phone: +15551234567" style="width: 300px;">
+      <button onclick="savePhone()">Save Number</button>
+    </div>
+    <p id="phoneStatus" style="color: green;"></p>
+
+    <button onclick="startScan()" id="startBtn">Start Scanner</button>
+    <button onclick="stopScan()" id="stopBtn" disabled>Stop</button>
+    <p class="status" id="status">Not running</p>
+
+    <div class="items" id="items"></div>
+  </div>
+
+  <script>
+    let scanning = false;
+
+    function savePhone() {
+      const phone = document.getElementById('phone').value.trim();
+      if (!phone.startsWith('+1')) {
+        alert('Please enter a valid US number: +15551234567');
+        return;
+      }
+      fetch('/save_phone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: phone })
+      }).then(r => r.json()).then(data => {
+        document.getElementById('phoneStatus').textContent = 'SMS number saved: ' + phone;
+      });
+    }
+
     function startScan() {
-        fetch('/start').then(r => r.json()).then(d => {
-            document.querySelector('.start').style.display = 'none';
-            document.querySelector('.stop').style.display = 'inline';
-            document.getElementById('status').innerText = 'Scanning every 15 min...';
-            pollItems();
-        });
+      fetch('/start').then(r => r.json()).then(updateUI);
+      document.getElementById('startBtn').disabled = true;
+      document.getElementById('stopBtn').disabled = false;
+      document.getElementById('status').textContent = 'Scanning...';
+      scanning = true;
+      setInterval(refresh, 5000);
     }
+
     function stopScan() {
-        fetch('/stop').then(() => {
-            document.querySelector('.start').style.display = 'inline';
-            document.querySelector('.stop').style.display = 'none';
-            document.getElementById('status').innerText = 'Stopped';
-        });
+      fetch('/stop');
+      document.getElementById('startBtn').disabled = false;
+      document.getElementById('stopBtn').disabled = true;
+      document.getElementById('status').textContent = 'Stopped';
+      scanning = false;
     }
-    function pollItems() {
-        if (document.querySelector('.stop').style.display === 'inline') {
-            fetch('/start').then(r => r.json()).then(d => {
-                let html = '';
-                d.items.forEach(i => {
-                    html += `<div class="item"><a href="${i.url}" target="_blank">${i.title}</a> <span class="price">$0.01</span></div>`;
-                });
-                document.getElementById('items').innerHTML = html;
-                setTimeout(pollItems, 10000);
-            });
-        }
+
+    function refresh() {
+      if (!scanning) return;
+      fetch('/').then(r => r.text()).then(html => {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        document.getElementById('items').innerHTML = doc.getElementById('items').innerHTML;
+      });
     }
-    </script>
+
+    function updateUI() { refresh(); }
+  </script>
 </body>
 </html>
